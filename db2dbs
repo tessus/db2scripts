@@ -4,7 +4,7 @@
 #
 # by Helmut K. C. Tessarek
 # name: db2dbs
-# parameter[s]: none
+# parameter[s]: [script name]
 
 #
 #  global variables
@@ -62,6 +62,15 @@ do
      fi
      if [ "$LOCAL" == "Indirect" ]; then
        echo Database $ACT_DB
+
+       if [ ! -z "$1" ]; then
+          sed "s/DBNAME/$ACT_DB/g" $1 >/tmp/$ACT_DB
+          
+          $SU - $ACT_INST -c "db2 -tvf /tmp/$ACT_DB"
+          
+          rm -f /tmp/$ACT_DB
+       fi
+       
      fi
   done
 done
