@@ -1,0 +1,60 @@
+#!/bin/ksh
+#
+# by Helmut K. C. Tessarek, version 0.5
+# name: db2tbs
+# parameter[s]: <database name>
+
+#
+#  global variables
+#
+
+PROGNAME=$(/bin/basename $0)
+
+#
+#  functions
+#
+
+function ERR
+{
+  echo "$PROGNAME: ERROR: $*"
+  exit 1
+}
+
+#
+#  main
+#
+
+if [ -z "$DB2INSTANCE"  ]; then
+  ERR "DB2 environment not set"
+fi
+
+db2 connect to $1
+
+if [ "$?" != "0" ]; then
+  exit $?
+fi
+
+printf "%3s %-16s  %15s %10s %12s %10s %12s %10s %6s %8s %3s\n" ID Name "Total pages" "Total MB" "Free pages" "Free MB" "Used pages" "Used MB" "Used %" Pagesize NCs
+db2 list tablespaces show detail | grep -v "Tablespaces for Current Database" | awk '\
+  $1 == "Tablespace" { tbspid = $4; next}
+  $1 == "Name" { name = $3; next }
+  $1 == "Total" { total = $4;next }
+  $1 == "Useable" { useable = $4;next }
+  $1 == "Used" { used = $4;next }
+  $1 == "Free" { free =$4;next }
+  $1 == "Page" { pagesize = $5; next }
+  $1 == "Number" { nc = $5;
+                   sumt += (total*pagesize/1024/1024);
+                   sumf += (free*pagesize/1024/1024);
+                   sumu += (used*pagesize/1024/1024);
+                 printf"%3d %-16s  %15d %10d %12d %10d %12d %10d %5d%% %8d %3d\n",
+                 tbspid, name, total, total*pagesize/1024/1024, free, free*pagesize/1024/1024, used, used*pagesize/1024/1024, (useable-free)*100/useable, pagesize, nc ;
+         next
+         }
+  END { print " -------------------------------------------------------------------------------------------------------------------";
+        printf"%48d %23d %23d\n", sumt, sumf, sumu ;
+      }
+  '
+echo
+db2 connect reset >/dev/null
+db2 terminate >/dev/null

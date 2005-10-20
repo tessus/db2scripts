@@ -1,0 +1,55 @@
+#!/bin/ksh
+#
+# by Helmut K. C. Tessarek, version 0.2
+# name: db2tbsc
+# parameter[s]: <database name>
+
+#
+#  global variables
+#
+
+PROGNAME=$(/bin/basename $0)
+
+#
+#  functions
+#
+
+function ERR
+{
+  echo "$PROGNAME: ERROR: $*"
+  exit 1
+}
+
+#
+#  main
+#
+
+if [ -z "$DB2INSTANCE"  ]; then
+  ERR "DB2 environment not set"
+fi
+
+if [ -z "$1"  ]; then
+  ERR "<db name> parameter is missing"
+fi
+
+db2 connect to $1
+
+if [ "$?" != "0" ]; then
+  exit $?
+fi
+
+N=`db2 -x "select max(tbspaceid) from syscat.tablespaces"`
+
+typeset -i i=0
+while true
+do
+   db2 list tablespace containers for $i show detail| grep -v SQL1008N
+   i=i+1
+   if((i > $N)); then
+     break
+   fi
+done
+
+echo
+db2 connect reset >/dev/null
+db2 terminate >/dev/null

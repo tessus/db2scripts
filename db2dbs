@@ -1,0 +1,70 @@
+#!/bin/ksh
+#
+# by Helmut K. C. Tessarek, version 0.3
+# name: db2dbs
+# parameter[s]: none
+
+#
+#  global variables
+#
+
+PROGNAME=$(/bin/basename $0)
+SU=/bin/su
+
+if [ "`uname`" = "Linux" ]
+then
+        _DB2_INST_DIR=/opt/IBM/db2/V8.1
+else
+        _DB2_INST_DIR=/usr/opt/db2_08_01
+fi
+_DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
+
+#
+#  functions
+#
+
+function ERR
+{
+  echo "$PROGNAME: ERROR: $*"
+  exit 1
+}
+
+#
+#  main
+#
+
+if [ "`id -u`" != "0" ]; then
+  ERR "you must be root to run this program"
+fi
+
+if [ ! -d $_DB2_INST_DIR ]; then
+  ERR "Directory $_DB2_INST_DIR not found (db2 may not be installed)"
+fi
+if [ ! -x $_DB2_INSTLIST ]; then
+  ERR "File $_DB2_INSTLIST not found (db2 may not be installed)"
+fi
+
+for ACT_INST in $($_DB2_INSTLIST 2>/dev/null)
+do
+  echo
+  echo Instance - $ACT_INST
+  echo
+
+  for ACT_DB in $($SU - $ACT_INST -c "db2 list db directory | awk '\$2 == \"alias\"  { alias = \$4;printf \"%s\\n\", alias}'")
+  do
+     if [ "`grep --version 2>/dev/null|grep -c GNU`" = "1" ]
+     then
+       LOCAL=$($SU - $ACT_INST -c "db2 list db directory show detail | grep -E \"alias.*$ACT_DB\" -A 5 | tail -1 | awk '{print \$5}'")
+     else
+       LOCAL=$($SU - $ACT_INST -c "db2 list db directory show detail | grep -p -E \"alias.*$ACT_DB\" | awk ' \$1 == \"Directory\"  { entry = \$5; printf \"%s\", entry; next }'")
+     fi
+     if [ "$LOCAL" == "Indirect" ]; then
+       echo Database $ACT_DB
+     fi
+  done
+done
+
+echo
+exit 0
+### EOF ###
+
