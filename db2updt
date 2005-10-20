@@ -1,6 +1,8 @@
 #!/bin/ksh
 #
-# by Helmut K. C. Tessarek, version 0.4
+# $Id$
+#
+# by Helmut K. C. Tessarek
 # name: db2updt
 # parameter[s]: none
 

@@ -1,6 +1,8 @@
 #!/bin/ksh
 #
-# by Helmut K. C. Tessarek, version 0.5
+# $Id$
+#
+# by Helmut K. C. Tessarek
 # name: db2tbs
 # parameter[s]: <database name>
 

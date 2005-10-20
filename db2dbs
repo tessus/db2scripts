@@ -1,6 +1,8 @@
 #!/bin/ksh
 #
-# by Helmut K. C. Tessarek, version 0.3
+# $Id$
+#
+# by Helmut K. C. Tessarek
 # name: db2dbs
 # parameter[s]: none
 
