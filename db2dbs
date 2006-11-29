@@ -15,9 +15,9 @@ SU=/bin/su
 
 if [ "`uname`" = "Linux" ]
 then
-        _DB2_INST_DIR=/opt/IBM/db2/V8.1
+        _DB2_INST_DIR=/opt/ibm/db2/V9.1
 else
-        _DB2_INST_DIR=/usr/opt/db2_08_01
+        _DB2_INST_DIR=/opt/IBM/db2/V9.1
 fi
 _DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
 
