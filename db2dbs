@@ -4,22 +4,43 @@
 #
 # by Helmut K. C. Tessarek
 # name: db2dbs
-# parameter[s]: [script name]
+# parameter[s]: [-f <scriptname>] [-b <baseInstallpathOfDB2>] [-h]
 
 #
 #  global variables
 #
 
+DFTPATH="/opt/IBM/db2/V8.1 /usr/opt/db2_08_01 /opt/ibm/db2/V9.1 /opt/IBM/db2/V9.1"
 PROGNAME=$(/bin/basename $0)
 SU=/bin/su
 
-if [ "`uname`" = "Linux" ]
+#
+# parse command line into arguments
+#
+
+set -- `getopt b:f:h $*`
+# check result of parsing
+if [ $? != 0 ]
 then
-        _DB2_INST_DIR=/opt/ibm/db2/V9.1
-else
-        _DB2_INST_DIR=/opt/IBM/db2/V9.1
+        exit 1
 fi
-_DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
+while [ $1 != -- ]
+do
+        case $1 in
+        -b)     # set up the -b flag
+                BFLG=1
+                BARG=$2
+                shift;;
+        -f)     # set up the -f flag
+                FFLG=1
+                FARG=$2
+                shift;;
+        -h)     # set up the -h flag
+                HFLG=1;;
+        esac
+        shift   # next flag
+done
+shift   # skip --
 
 #
 #  functions
@@ -31,9 +52,40 @@ function ERR
   exit 1
 }
 
+function HELP
+{
+  echo "Usage: $PROGNAME [-f <scriptname>] [-b <baseInstallpathOfDB2>] [-h]"
+  exit 1
+}
+
+if [ "$HFLG" = "1" ]
+then
+  HELP
+fi
+
 #
 #  main
 #
+
+for p in $DFTPATH
+do
+  if [ -d $p ]
+  then
+    _DB2_INST_DIR=$p
+  fi
+done
+
+if [ ! -z "$BARG" ]
+then
+  _DB2_INST_DIR=$BARG
+fi
+
+if [ -z "$_DB2_INST_DIR" ]
+then
+  ERR "install directory not found. specify it with -b option"
+fi
+
+_DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
 
 if [ "`id -u`" != "0" ]; then
   ERR "you must be root to run this program"
@@ -63,8 +115,8 @@ do
      if [ "$LOCAL" == "Indirect" ]; then
        echo Database $ACT_DB
 
-       if [ ! -z "$1" ]; then
-          sed "s/DBNAME/$ACT_DB/g" $1 >/tmp/$ACT_DB
+       if [ ! -z "$FARG" ]; then
+          sed "s/DBNAME/$ACT_DB/g" $FARG >/tmp/$ACT_DB
           
           $SU - $ACT_INST -c "db2 -tvf /tmp/$ACT_DB"
           
