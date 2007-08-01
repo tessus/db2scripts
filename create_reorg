@@ -1,0 +1,114 @@
+#!/bin/ksh
+#
+# $Id$
+#
+# by Helmut K. C. Tessarek
+# name: create_reorg
+# parameter[s]: -d <database name> [-t <tablespace>] [-h]
+
+#
+#  global variables
+#
+
+PROGNAME=$(/bin/basename $0)
+
+#
+# parse command line into arguments
+#
+
+set -- `getopt d:t:h $*`
+# check result of parsing
+if [ $? != 0 ]
+then
+        exit 1
+fi
+while [ $1 != -- ]
+do
+        case $1 in
+        -d)     # set up the -d flag
+                DFLG=1
+                DARG=$2
+                shift;;
+        -t)     # set up the -t flag
+                TFLG=1
+                TARG=$2
+                shift;;
+	-h)     # set up the -h flag
+                HFLG=1;;
+        esac
+        shift   # next flag
+done
+shift   # skip --
+
+#
+#  functions
+#
+
+function ERR
+{
+  echo "$PROGNAME: ERROR: $*"
+  exit 1
+}
+
+function HELP
+{
+  echo "Usage: $PROGNAME -d <database name> [-t <tablespace>] [-h]"
+  exit 1
+}
+
+if [ "$HFLG" = "1" ]
+then
+  HELP
+fi
+
+if [ "$DFLG" != "1" ]
+then
+  HELP
+fi
+
+#
+#  main
+#
+
+if [ -z "$DB2INSTANCE"  ]; then
+  ERR "DB2 environment not set"
+fi
+
+db2 connect to $DARG >/dev/null
+
+if [ "$?" != "0" ]; then
+  echo Cannot connect to $DARG
+  echo Error.
+  exit 1
+fi
+
+echo Connected to database: $DARG
+
+if [ "$TFLG" = "1" ]
+then
+  db2 "select tbspace from syscat.tablespaces where tbspace = '${TARG}'" >/dev/null
+  if [ "$?" != "0" ]; then
+    echo Tablespace $TARG does not exist!!!
+    echo Error.
+    db2 connect reset >/dev/null
+    db2 terminate >/dev/null
+    exit 1
+  fi
+  STMT="select 'reorg indexes all for table \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" allow write access;' from syscat.tables where tbspace = '${TARG}'"
+else
+  STMT="select 'reorg indexes all for table \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" allow write access;' from syscat.tables where tbspace not like 'SYS%'"
+  TARG=ALL
+fi
+
+FN=reorg_indexes_${TARG}.sql
+
+echo Creating DB2 script: $FN
+db2 -x "${STMT}" >$FN
+
+db2 connect reset >/dev/null
+db2 terminate >/dev/null
+
+echo Success.
+
+exit 0
+### EOF ###
