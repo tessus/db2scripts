@@ -4,7 +4,10 @@
 #
 # by Helmut K. C. Tessarek
 # name: create_reorg
-# parameter[s]: -d <database name> [-t <tablespace>] [-h]
+# parameter[s]: -d <database name> [-m <method>] [-t <tablespace>] [-h]
+#       method: 1 || index_online (default)
+#               2 || index_offline
+#               3 || table_offline
 
 #
 #  global variables
@@ -16,7 +19,7 @@ PROGNAME=$(/bin/basename $0)
 # parse command line into arguments
 #
 
-set -- `getopt d:t:h $*`
+set -- `getopt d:m:t:h $*`
 # check result of parsing
 if [ $? != 0 ]
 then
@@ -28,6 +31,10 @@ do
         -d)     # set up the -d flag
                 DFLG=1
                 DARG=$2
+                shift;;
+        -m)     # set up the -m flag
+                MFLG=1
+                MARG=$2
                 shift;;
         -t)     # set up the -t flag
                 TFLG=1
@@ -52,7 +59,10 @@ function ERR
 
 function HELP
 {
-  echo "Usage: $PROGNAME -d <database name> [-t <tablespace>] [-h]"
+  echo "Usage: $PROGNAME -d <database name> [-m <method>] [-t <tablespace>] [-h]"
+  echo "       <method> 1 || index_online (default)"
+  echo "                2 || index_offline"
+  echo "                3 || table_offline"
   exit 1
 }
 
@@ -64,6 +74,37 @@ fi
 if [ "$DFLG" != "1" ]
 then
   HELP
+fi
+
+if [ "$MFLG" != "1" ]
+then
+  MARG=1
+fi
+
+if [ "$MARG" != "1" -a "$MARG" != "2" -a "$MARG" != "3" -a "$MARG" != "index_online" -a "$MARG" != "index_offline" -a "$MARG" != "table_offline" ]
+then
+  HELP
+fi
+
+if [ "$MARG" = "1" -o "$MARG" = "index_online" ]
+then
+  FNP=indexes_online
+  STMTSTART="reorg indexes all for table"
+  STMTEND="allow write access"
+fi
+
+if [ "$MARG" = "2" -o "$MARG" = "index_offline" ]
+then
+  FNP=indexes_offline
+  STMTSTART="reorg indexes all for table"
+  STMTEND=""
+fi
+
+if [ "$MARG" = "3" -o "$MARG" = "table_offline" ]
+then
+  FNP=tables_offline
+  STMTSTART="reorg table"
+  STMTEND=""
 fi
 
 #
@@ -84,6 +125,8 @@ fi
 
 echo Connected to database: $DARG
 
+# reorg table schema.tablename [USE tempspace]
+
 if [ "$TFLG" = "1" ]
 then
   db2 "select tbspace from syscat.tablespaces where tbspace = '${TARG}'" >/dev/null
@@ -94,13 +137,13 @@ then
     db2 terminate >/dev/null
     exit 1
   fi
-  STMT="select 'reorg indexes all for table \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" allow write access;' from syscat.tables where tbspace = '${TARG}'"
+  STMT="select '${STMTSTART} \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" ${STMTEND};' from syscat.tables where tbspace = '${TARG}'"
 else
-  STMT="select 'reorg indexes all for table \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" allow write access;' from syscat.tables where tbspace not like 'SYS%'"
+  STMT="select '${STMTSTART} \"' || rtrim(tabschema) || '\".\"' || rtrim(tabname) || '\" ${STMTEND};' from syscat.tables where tbspace not like 'SYS%'"
   TARG=ALL
 fi
 
-FN=reorg_indexes_${TARG}.sql
+FN=reorg_${FNP}_${TARG}.sql
 
 echo Creating DB2 script: $FN
 db2 -x "${STMT}" >$FN
