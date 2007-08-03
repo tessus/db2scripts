@@ -4,7 +4,7 @@
 #
 # by Helmut K. C. Tessarek
 # name: create_reorg
-# parameter[s]: -d <database name> [-m <method>] [-t <tablespace>] [-h]
+# parameter[s]: -d <database name> [-m <method>] [-t <tablespace>] [-u <tempspace>] [-h]
 #       method: 1 || index_online (default)
 #               2 || index_offline
 #               3 || table_offline
@@ -19,7 +19,7 @@ PROGNAME=$(/bin/basename $0)
 # parse command line into arguments
 #
 
-set -- `getopt d:m:t:h $*`
+set -- `getopt d:m:u:t:h $*`
 # check result of parsing
 if [ $? != 0 ]
 then
@@ -36,7 +36,11 @@ do
                 MFLG=1
                 MARG=$2
                 shift;;
-        -t)     # set up the -t flag
+        -u)     # set up the -u flag
+                UFLG=1
+                UARG=$2
+                shift;;
+	-t)     # set up the -t flag
                 TFLG=1
                 TARG=$2
                 shift;;
@@ -59,7 +63,7 @@ function ERR
 
 function HELP
 {
-  echo "Usage: $PROGNAME -d <database name> [-m <method>] [-t <tablespace>] [-h]"
+  echo "Usage: $PROGNAME -d <database name> [-m <method>] [-t <tablespace>] [-u <tempspace>] [-h]"
   echo "       <method> 1 || index_online (default)"
   echo "                2 || index_offline"
   echo "                3 || table_offline"
@@ -100,11 +104,23 @@ then
   STMTEND=""
 fi
 
+if [ "$UFLG" = "1" -a "$MARG" != "3" -a "$MARG" != "table_offline" ]
+then
+  echo "The -u option can only be used for a table reorg"
+  echo "Error."
+  exit 1;
+fi
+
 if [ "$MARG" = "3" -o "$MARG" = "table_offline" ]
 then
   FNP=tables_offline
   STMTSTART="reorg table"
-  STMTEND=""
+  if [ "$UFLG" = "1" ]
+  then
+    STMTEND="use \"${UARG}\""
+  else
+    STMTEND=""
+  fi
 fi
 
 #
@@ -125,13 +141,33 @@ fi
 
 echo Connected to database: $DARG
 
-# reorg table schema.tablename [USE tempspace]
+if [ "$UFLG" = "1" ]
+then
+  db2 "select tbspace from syscat.tablespaces where tbspace = '${UARG}'" >/dev/null
+  if [ "$?" != "0" ]; then
+    echo Tablespace $UARG does not exist!!!
+    echo Info: tempspace parameter is case-sensitive.
+    echo Available Tablespaces:
+    echo ----------------------
+    db2 -x "select tbspace from syscat.tablespaces"
+    echo ----------------------
+    echo Error.
+    db2 connect reset >/dev/null
+    db2 terminate >/dev/null
+    exit 1
+  fi
+fi
 
 if [ "$TFLG" = "1" ]
 then
   db2 "select tbspace from syscat.tablespaces where tbspace = '${TARG}'" >/dev/null
   if [ "$?" != "0" ]; then
     echo Tablespace $TARG does not exist!!!
+    echo Info: tablespace parameter is case-sensitive.
+    echo Available Tablespaces:
+    echo ----------------------
+    db2 -x "select tbspace from syscat.tablespaces"
+    echo ----------------------
     echo Error.
     db2 connect reset >/dev/null
     db2 terminate >/dev/null
