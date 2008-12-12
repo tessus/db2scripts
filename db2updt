@@ -85,7 +85,6 @@ fi
 
 _DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
 _DB2_DASLIST=$_DB2_INST_DIR/instance/daslist
-_DB2_IUPDT=$_DB2_INST_DIR/instance/db2iupdt
 _DB2_DASUPDT=$_DB2_INST_DIR/instance/dasupdt
 
 for i in 8 9 10 11
@@ -109,23 +108,12 @@ fi
 if [ ! -x $_DB2_DASLIST ]; then
   ERR "File $_DB2_DASLIST not found (db2 may not be installed)"
 fi
-if [ ! -x $_DB2_IUPDT ]; then
-  ERR "File $_DB2_IUPDT not found (db2 may not be installed)"
-fi
 if [ ! -x $_DB2_DASUPDT ]; then
   ERR "File $_DB2_DASUPDT not found (db2 may not be installed)"
 fi
 
 for ACT_INST in $($_DB2_INSTLIST 2>/dev/null)
 do
-  echo
-  echo Updating instance - $ACT_INST
-  echo
-  
-  ## db2iupdt
-  
-  $_DB2_IUPDT $ACT_INST
-  
   $SU - $ACT_INST -c "db2start"
   
   for ACT_DB in $($SU - $ACT_INST -c "db2 list db directory | awk '\$2 == \"alias\"  { alias = \$4;printf \"%s\\n\", alias}'")
