@@ -1,0 +1,260 @@
+#!/bin/ksh
+#
+# $Id$
+#
+# get performance data for a given database and system information
+#
+# by Helmut K. C. Tessarek
+# name: getperfdata
+# parameter[s]: -d <database name> [-h]
+
+#
+#  global variables
+#
+
+PROGNAME=$(/bin/basename $0)
+
+VMSTAT_INTERVAL=30
+VMSTAT_OPTIONS=
+IOSTAT_INTERVAL=30
+IOSTAT_OPTIONS=
+DB2PD_INTERVAL=300
+DB2PD_OPTIONS_8="-locks"
+DB2PD_OPTIONS_9="-locks"
+DB2SUPPORT_OPTIONS="-c -cl 0"
+
+#
+# parse command line into arguments
+#
+
+set -- `getopt d:h $*`
+# check result of parsing
+if [ $? != 0 ]
+then
+        exit 1
+fi
+while [ $1 != -- ]
+do
+        case $1 in
+        -d)     # set up the -d flag
+                DFLG=1
+                DARG=$2
+                shift;;
+        -h)     # set up the -h flag
+                HFLG=1;;
+        esac
+        shift   # next flag
+done
+shift   # skip --
+
+#
+#  functions
+#
+
+function ERR
+{
+  echo "$PROGNAME: ERROR: $*"
+  exit 1
+}
+
+function HELP
+{
+  echo "Usage: $PROGNAME -d <database name> [-h]"
+  exit 1
+}
+
+function cont
+{
+  echo "Press <ENTER> to continue"
+  echo "-----------------------------------------------"
+  read dummy
+}
+
+#
+#  main
+#
+
+if [ "$HFLG" = "1" ]
+then
+  HELP
+fi
+
+if [ -z "$DARG" ]
+then
+  HELP
+fi
+
+DBNAME=$DARG
+
+# connect to database and get version 
+
+echo
+echo "connect to database ${DBNAME}..."
+db2 connect to $DBNAME >con.out
+REL=`cat con.out|grep server|awk '{print $5}'`
+VER=`echo $REL|cut -b 1-1`
+
+if [ "$REL" = "" ]
+then
+  cat con.out
+  rm con.out
+  ERR Cannot connect to database
+fi
+
+rm con.out
+
+# create directory for storing data
+DIR="${DBNAME}_${VER}_data"
+mkdir $DIR
+
+# collecting data about instance and database
+echo
+echo "collecting data about instance and database ${DBNAME}..."
+
+db2pd -osinfo >$DIR/db2pd_osinfo
+db2pd -inst >$DIR/db2pd_inst
+db2pd -db $DBNAME -dbmcfg -dbcfg >$DIR/db2pd_cfgs
+db2pd -db $DBNAME -bufferpools -tablespaces >$DIR/db2pd_buf_tab
+db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema not like 'SYS%' order by 1,2" >$DIR/tab_stats
+db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema like 'SYS%' order by 1,2" >$DIR/tabsys_stats
+if [ "$VER" = "9" ]
+then
+  db2 "select tabschema, tabname, tabtype, index_type, large_rids, large_slots from sysibmadm.admintabinfo order by 1,2" >$DIR/table_info
+fi
+
+# turning monitor switches on
+echo
+echo "setting monitor switches to ON - just in case they are off..."
+echo
+db2 update monitor switches using BUFFERPOOL on
+db2 update monitor switches using LOCK on
+db2 update monitor switches using SORT on
+db2 update monitor switches using STATEMENT on
+db2 update monitor switches using TABLE on
+db2 update monitor switches using TIMESTAMP on
+db2 update monitor switches using UOW on
+
+echo
+echo "check status of monitor switches"
+db2 get monitor switches
+
+echo "-----------------------------------------------"
+echo "Wait until workload is started..."
+cont
+
+echo "resetting monitor switches"
+echo
+db2 reset monitor all
+
+echo
+if [ "$VMSTAT_INTERVAL" != "0" ]
+then
+  vmstat $VMSTAT_OPTIONS $VMSTAT_INTERVAL >$DIR/vmstat.out &
+  VPID=`echo $!`
+  echo "starting vmstat with PID: $VPID"
+fi
+
+if [ "$IOSTAT_INTERVAL" != "0" ]
+then
+  iostat $IOSTAT_OPTIONS $IOSTAT_INTERVAL >$DIR/iostat.out &
+  IPID=`echo $!`
+  echo "starting iostat with PID: $IPID"
+fi
+
+if [ "$DB2PD_INTERVAL" != "0" ]
+then
+  if [ "$VER" = "8" ]
+  then
+    db2pd -db $DBNAME -repeat $DB2PD_INTERVAL $DB2PD_OPTIONS_8 >$DIR/db2pd.out &
+    DPID=`echo $!`
+  fi
+  if [ "$VER" = "9" ]
+  then
+    db2pd -db $DBNAME -repeat $DB2PD_INTERVAL $DB2PD_OPTIONS_9 >$DIR/db2pd.out &
+    DPID=`echo $!`
+  fi
+  echo "starting db2pd with PID: $DPID"
+fi
+
+echo
+echo "-----------------------------------------------"
+echo "Wait until workload is over..."
+cont
+
+if [ -n "$VPID" ]
+then
+  echo "end vmstat"
+  kill $VPID
+fi
+
+if [ -n "$IPID" ]
+then
+  echo "end iostat"
+  kill $IPID
+fi
+
+if [ -n "$DPID" ]
+then
+  echo "end db2pd"
+  kill $DPID
+fi
+
+echo
+echo "getting snapshots...."
+echo "all snapshot on db"
+db2 get snapshot for all on $DBNAME > $DIR/snap.all_$DBNAME
+echo "dbm snapshot"
+db2 get snapshot for database manager > $DIR/snap.dbm
+echo "db snapshot"
+db2 get snapshot for database on $DBNAME > $DIR/snap.db
+echo "bp snapshot"
+db2 get snapshot for bufferpools on $DBNAME > $DIR/snap.bufferpools
+echo "tsp snapshot"
+db2 get snapshot for tablespaces on $DBNAME > $DIR/snap.tsp
+echo "table snapshot"
+db2 get snapshot for tables on $DBNAME > $DIR/snap.tables
+echo "lock snapshot"
+db2 get snapshot for locks on $DBNAME > $DIR/snap.locks
+echo "dbm cfg"
+db2 get dbm cfg > $DIR/cfg.dbm
+echo "db cfg"
+db2 get db cfg for $DBNAME > $DIR/cfg.db
+echo "dbset cfg"
+db2set -all > $DIR/cfg.db2set
+
+#echo "Turning monitor switches off.."
+#db2 update monitor switches using LOCK off
+#db2 update monitor switches using SORT off
+#db2 update monitor switches using STATEMENT off
+#db2 update monitor switches using TABLE off
+#db2 update monitor switches using TIMESTAMP off
+#db2 update monitor switches using UOW off
+#check_switches
+
+echo
+echo "creating tarball..."
+tar -cf ${DIR}.tar ./$DIR
+gzip ${DIR}.tar
+rm -f ./${DIR}/*
+rmdir ${DIR}
+TARBALL=${DIR}.tar.gz
+
+if [ -n "$DB2SUPPORT_OPTIONS" ]
+then
+  db2support . -d $DBNAME -f $DB2SUPPORT_OPTIONS -o db2support_${DBNAME}_${VER}
+fi
+
+echo
+echo "-----------------------------------------------"
+echo "-----------------------------------------------"
+echo "   Please send the following file(s) to IBM:   "
+echo "-----------------------------------------------"
+echo $TARBALL
+if [ -n "$DB2SUPPORT_OPTIONS" ]
+then
+  echo db2support_${DBNAME}_${VER}.zip
+fi
+echo "-----------------------------------------------"
+echo "-----------------------------------------------"
+echo
+
