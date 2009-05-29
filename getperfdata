@@ -18,7 +18,7 @@ VMSTAT_INTERVAL=30
 VMSTAT_OPTIONS=
 IOSTAT_INTERVAL=30
 IOSTAT_OPTIONS=
-DB2PD_INTERVAL=300
+DB2PD_INTERVAL=0
 DB2PD_OPTIONS_8="-bufferpools -memsets -mempools"
 DB2PD_OPTIONS_9="-bufferpools -memsets -mempools -latches -locks showlocks wait -wlocks"
 DB2SUPPORT_OPTIONS="-c -cl 0"
@@ -115,12 +115,12 @@ db2pd -osinfo >$DIR/db2pd_osinfo
 db2pd -inst >$DIR/db2pd_inst
 db2pd -db $DBNAME -dbmcfg -dbcfg >$DIR/db2pd_cfgs
 db2pd -db $DBNAME -bufferpools -tablespaces >$DIR/db2pd_buf_tab
-db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema not like 'SYS%' order by 1,2" >$DIR/tab_stats
-db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema like 'SYS%' order by 1,2" >$DIR/tabsys_stats
-if [ "$VER" = "9" ]
-then
-  db2 "select tabschema, tabname, tabtype, index_type, large_rids, large_slots from sysibmadm.admintabinfo order by 1,2" >$DIR/table_info
-fi
+#db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema not like 'SYS%' order by 1,2" >$DIR/tab_stats
+#db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema like 'SYS%' order by 1,2" >$DIR/tabsys_stats
+#if [ "$VER" = "9" ]
+#then
+#  db2 "select tabschema, tabname, tabtype, index_type, large_rids, large_slots from sysibmadm.admintabinfo order by 1,2" >$DIR/table_info
+#fi
 
 # turning monitor switches on
 echo
@@ -176,15 +176,15 @@ then
   echo "starting db2pd with PID: $DPID"
 fi
 
-if [ "$VER" = "8" ]
-then
-  for i in 1; do sleep 900; db2 get snapshot for dynamic sql on $DBNAME >$DIR/snap.dynamicsql ; done &
-fi
+#if [ "$VER" = "8" ]
+#then
+#  for i in 1; do sleep 900; db2 get snapshot for dynamic sql on $DBNAME >$DIR/snap.dynamicsql ; done &
+#fi
 
-if [ "$VER" = "9" ]
-then
-  for i in 1; do sleep 1200; db2 get snapshot for dynamic sql on $DBNAME >$DIR/snap.dynamicsql ; done &
-fi
+#if [ "$VER" = "9" ]
+#then
+#  for i in 1; do sleep 1200; db2 get snapshot for dynamic sql on $DBNAME >$DIR/snap.dynamicsql ; done &
+#fi
 
 echo
 echo "-----------------------------------------------"
@@ -232,13 +232,13 @@ db2 get db cfg for $DBNAME > $DIR/cfg.db
 echo "dbset cfg"
 db2set -all > $DIR/cfg.db2set
 
-#echo "Turning monitor switches off.."
-#db2 update monitor switches using LOCK off
-#db2 update monitor switches using SORT off
-#db2 update monitor switches using STATEMENT off
-#db2 update monitor switches using TABLE off
-#db2 update monitor switches using TIMESTAMP off
-#db2 update monitor switches using UOW off
+echo "Turning monitor switches off.."
+db2 update monitor switches using LOCK off
+db2 update monitor switches using SORT off
+db2 update monitor switches using STATEMENT off
+db2 update monitor switches using TABLE off
+db2 update monitor switches using TIMESTAMP off
+db2 update monitor switches using UOW off
 #check_switches
 
 echo
