@@ -4,7 +4,7 @@
 #
 # by Helmut K. C. Tessarek
 # name: db2updt
-# parameter[s]: [-b <baseInstallpathOfDB2>] [-h]
+# parameter[s]: [-b <baseInstallpathOfDB2>] [-i] [-a] [-h]
 
 #
 #  global variables
@@ -51,7 +51,7 @@ function ERR
 
 function HELP
 {
-  echo "Usage: $PROGNAME [-b <baseInstallpathOfDB2>] [-h]"
+  echo "Usage: $PROGNAME [-b <baseInstallpathOfDB2>] [-a] [-h]"
   exit 1
 }
 
@@ -145,6 +145,8 @@ do
   done
 done
 
+if [ "$AFLG" = "1" ]
+then
 ACT_DAS=$($_DB2_DASLIST)
 
 if [ ! -z "$ACT_DAS" ]
@@ -162,6 +164,7 @@ else
   echo
   echo No admin server installed
   echo
+fi
 fi
 
 exit 0
