@@ -11,7 +11,7 @@
 #
 
 # put path of most recent version first
-DFTPATH="/opt/ibm/db2/V9.5 /opt/IBM/db2/V9.5 /opt/ibm/db2/V9.1 /opt/IBM/db2/V9.1 /opt/IBM/db2/V8.1 /usr/opt/db2_08_01"
+DFTPATH="/opt/ibm/db2/V9.7 /opt/IBM/db2/V9.7 /opt/ibm/db2/V9.5 /opt/IBM/db2/V9.5 /opt/ibm/db2/V9.1 /opt/IBM/db2/V9.1 /opt/IBM/db2/V8.1 /usr/opt/db2_08_01"
 PROGNAME=$(/bin/basename $0)
 SU=/bin/su
 
