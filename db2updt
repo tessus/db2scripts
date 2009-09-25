@@ -34,6 +34,10 @@ do
                 shift;;
         -h)     # set up the -h flag
                 HFLG=1;;
+        -a)     # set up the -a flag
+                AFLG=1;;
+        -i)     # set up the -i flag
+                IFLG=1;;
         esac
         shift   # next flag
 done
@@ -51,7 +55,7 @@ function ERR
 
 function HELP
 {
-  echo "Usage: $PROGNAME [-b <baseInstallpathOfDB2>] [-a] [-h]"
+  echo "Usage: $PROGNAME [-b <baseInstallpathOfDB2>] [-i] [-a] [-h]"
   exit 1
 }
 
@@ -85,6 +89,7 @@ fi
 
 _DB2_INSTLIST=$_DB2_INST_DIR/instance/db2ilist
 _DB2_DASLIST=$_DB2_INST_DIR/instance/daslist
+_DB2_IUPDT=$_DB2_INST_DIR/instance/db2iupdt
 _DB2_DASUPDT=$_DB2_INST_DIR/instance/dasupdt
 
 for i in 8 9 10 11
@@ -108,12 +113,22 @@ fi
 if [ ! -x $_DB2_DASLIST ]; then
   ERR "File $_DB2_DASLIST not found (db2 may not be installed)"
 fi
+if [ ! -x $_DB2_IUPDT ]; then
+  ERR "File $_DB2_IUPDT not found (db2 may not be installed)"
+fi
 if [ ! -x $_DB2_DASUPDT ]; then
   ERR "File $_DB2_DASUPDT not found (db2 may not be installed)"
 fi
 
 for ACT_INST in $($_DB2_INSTLIST 2>/dev/null)
 do
+  if [ "$IFLG" = "1" ]
+  then
+    echo
+    echo Updating instance - $ACT_INST
+    echo
+    $_DB2_IUPDT $ACT_INST
+  fi
   $SU - $ACT_INST -c "db2start"
   
   for ACT_DB in $($SU - $ACT_INST -c "db2 list db directory | awk '\$2 == \"alias\"  { alias = \$4;printf \"%s\\n\", alias}'")
@@ -147,24 +162,24 @@ done
 
 if [ "$AFLG" = "1" ]
 then
-ACT_DAS=$($_DB2_DASLIST)
+  ACT_DAS=$($_DB2_DASLIST)
 
-if [ ! -z "$ACT_DAS" ]
-then
-  echo
-  echo Updating admin server - $ACT_DAS
-  echo
+  if [ ! -z "$ACT_DAS" ]
+  then
+    echo
+    echo Updating admin server - $ACT_DAS
+    echo
 
-  ## dasupdt
+    ## dasupdt
 
-  $_DB2_DASUPDT $ACT_DAS
+    $_DB2_DASUPDT $ACT_DAS
 
-  $SU - $ACT_DAS -c "db2admin start"
-else
-  echo
-  echo No admin server installed
-  echo
-fi
+    $SU - $ACT_DAS -c "db2admin stop"
+  else
+    echo
+    echo No admin server installed
+    echo
+  fi
 fi
 
 exit 0
