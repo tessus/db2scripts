@@ -6,7 +6,7 @@
 #
 # by Helmut K. C. Tessarek
 # name: getperfdata
-# parameter[s]: -d <database name> [-h]
+# parameter[s]: -d <database name> [-k] [-s] [-h]
 
 #
 #  global variables
@@ -14,20 +14,26 @@
 
 PROGNAME=$(/bin/basename $0)
 
-VMSTAT_INTERVAL=30
+# default values
+
+VMSTAT_INTERVAL=60
 VMSTAT_OPTIONS=
-IOSTAT_INTERVAL=30
-IOSTAT_OPTIONS=
+IOSTAT_INTERVAL=60
+IOSTAT_OPTIONS=-RDlT
 DB2PD_INTERVAL=0
 DB2PD_OPTIONS_8="-bufferpools -memsets -mempools"
 DB2PD_OPTIONS_9="-bufferpools -memsets -mempools -latches -locks showlocks wait -wlocks"
-DB2SUPPORT_OPTIONS="-c -cl 0"
+DB2SUPPORT_OPTIONS=
+#DB2SUPPORT_OPTIONS="-c -cl 0"
+SNAP_INTERVAL=0
+KEEPDIR=0
+COLSTATINFO=0
 
 #
 # parse command line into arguments
 #
 
-set -- `getopt d:h $*`
+set -- `getopt d:ksh $*`
 # check result of parsing
 if [ $? != 0 ]
 then
@@ -40,6 +46,10 @@ do
                 DFLG=1
                 DARG=$2
                 shift;;
+        -k)     # set up the -k flag
+                KFLG=1;;
+        -s)     # set up the -s flag
+                SFLG=1;;
         -h)     # set up the -h flag
                 HFLG=1;;
         esac
@@ -59,7 +69,10 @@ function ERR
 
 function HELP
 {
-  echo "Usage: $PROGNAME -d <database name> [-h]"
+  echo "Usage: $PROGNAME -d <database name> [-k] [-s] [-h]"
+  echo
+  echo "-k	keep directory"
+  echo "-s	collect statistics info for tables"
   exit 1
 }
 
@@ -79,12 +92,27 @@ then
   HELP
 fi
 
+if [ "$KFLG" = "1" ]
+then
+  KEEPDIR=1
+fi
+
+if [ "$SFLG" = "1" ]
+then
+  COLSTATINFO=1
+fi
+
 if [ -z "$DARG" ]
 then
   HELP
 fi
 
 DBNAME=$DARG
+
+# create directory for storing data
+TT=`date +"%Y-%m-%d_%H.%M.%S"`
+DIR="${DBNAME}_${TT}_data"
+mkdir $DIR
 
 # connect to database and get version
 
@@ -103,10 +131,6 @@ fi
 
 rm con.out
 
-# create directory for storing data
-DIR="${DBNAME}_${VER}_data"
-mkdir $DIR
-
 # collecting data about instance and database
 echo
 echo "collecting data about instance and database ${DBNAME}..."
@@ -115,12 +139,16 @@ db2pd -osinfo >$DIR/db2pd_osinfo
 db2pd -inst >$DIR/db2pd_inst
 db2pd -db $DBNAME -dbmcfg -dbcfg >$DIR/db2pd_cfgs
 db2pd -db $DBNAME -bufferpools -tablespaces >$DIR/db2pd_buf_tab
-#db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema not like 'SYS%' order by 1,2" >$DIR/tab_stats
-#db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema like 'SYS%' order by 1,2" >$DIR/tabsys_stats
-#if [ "$VER" = "9" ]
-#then
-#  db2 "select tabschema, tabname, tabtype, index_type, large_rids, large_slots from sysibmadm.admintabinfo order by 1,2" >$DIR/table_info
-#fi
+
+if [ "$COLSTATINFO" = "1" ]
+then
+  db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema not like 'SYS%' order by 1,2" >$DIR/tab_stats
+  db2 "select tabschema, tabname, type, tbspace, index_tbspace, stats_time from syscat.tables where tabschema like 'SYS%' order by 1,2" >$DIR/tabsys_stats
+  if [ "$VER" = "9" ]
+  then
+    db2 "select tabschema, tabname, tabtype, index_type, large_rids, large_slots from sysibmadm.admintabinfo order by 1,2" >$DIR/table_info
+  fi
+fi
 
 # turning monitor switches on
 echo
@@ -186,6 +214,18 @@ fi
 #  for i in 1; do sleep 1200; db2 get snapshot for dynamic sql on $DBNAME >$DIR/snap.dynamicsql ; done &
 #fi
 
+if [ "$SNAP_INTERVAL" != "0" ]
+then
+  while true
+   do
+    TS=`date +"%Y-%m-%d_%H.%M.%S"`
+    db2 get snapshot for all on $DBNAME > $DIR/snap.all_${DBNAME}_${TS}
+    sleep $SNAP_INTERVAL
+   done &
+  SPID=`echo $!`
+  echo "starting automatic snapshots with PID: $SPID"
+fi
+
 echo
 echo "-----------------------------------------------"
 echo "Wait until workload is over..."
@@ -207,6 +247,12 @@ if [ -n "$DPID" ]
 then
   echo "end db2pd"
   kill $DPID
+fi
+
+if [ -n "$SPID" ]
+then
+  echo "end automatic snapshots"
+  kill $SPID
 fi
 
 echo
@@ -245,13 +291,17 @@ echo
 echo "creating tarball..."
 tar -cf ${DIR}.tar ./$DIR
 gzip ${DIR}.tar
-rm -f ./${DIR}/*
-rmdir ${DIR}
+if [ "$KEEPDIR" = "0" ]
+then
+  rm -f ./${DIR}/*
+  rmdir ${DIR}
+fi
 TARBALL=${DIR}.tar.gz
 
 if [ -n "$DB2SUPPORT_OPTIONS" ]
 then
-  db2support . -d $DBNAME -f $DB2SUPPORT_OPTIONS -o db2support_${DBNAME}_${VER}
+  TT2=`date +"%Y-%m-%d_%H.%M.%S"`
+  db2support . -d $DBNAME -f $DB2SUPPORT_OPTIONS -o db2support_${DBNAME}_${TT2}
 fi
 
 echo
@@ -262,9 +312,8 @@ echo "-----------------------------------------------"
 echo $TARBALL
 if [ -n "$DB2SUPPORT_OPTIONS" ]
 then
-  echo db2support_${DBNAME}_${VER}.zip
+  echo db2support_${DBNAME}_${TT2}.zip
 fi
 echo "-----------------------------------------------"
 echo "-----------------------------------------------"
 echo
-
