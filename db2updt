@@ -92,7 +92,7 @@ _DB2_DASLIST=$_DB2_INST_DIR/instance/daslist
 _DB2_IUPDT=$_DB2_INST_DIR/instance/db2iupdt
 _DB2_DASUPDT=$_DB2_INST_DIR/instance/dasupdt
 
-for i in 8 9 10 11
+for i in 8 91 95 97 98
 do
   if [ -x $_DB2_INST_DIR/bin/db2updv$i ]
   then
