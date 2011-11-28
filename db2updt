@@ -134,7 +134,7 @@ do
   for ACT_DB in $($SU - $ACT_INST -c "db2 list db directory | awk '\$2 == \"alias\"  { alias = \$4;printf \"%s\\n\", alias}'")
   do
      ## db2start
-     if [ "`grep --version 2>/dev/null|grep -c GNU`" = "1" ]
+     if [ "`grep --version|head -n1 2>/dev/null|grep -c GNU`" = "1" ]
      then
        LOCAL=$($SU - $ACT_INST -c "db2 list db directory show detail | grep -E \"alias.*$ACT_DB\" -A 5 | tail -1 | awk '{print \$5}'")
      else
