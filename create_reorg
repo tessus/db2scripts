@@ -1,7 +1,5 @@
 #!/bin/ksh
 #
-# $Id$
-#
 # by Helmut K. C. Tessarek
 # name: create_reorg
 # parameter[s]: -d <database name> [-m <method>] [-t <tablespace>] [-u <tempspace>] [-h]

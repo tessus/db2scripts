@@ -1,4 +1,3 @@
--- $Id$
 -- written by Helmut K. C. Tessarek, 30.05.2007
 
 -- To create the SQL procedure:

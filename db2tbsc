@@ -1,7 +1,5 @@
 #!/bin/ksh
 #
-# $Id$
-#
 # by Helmut K. C. Tessarek
 # name: db2tbsc
 # parameter[s]: <database name>

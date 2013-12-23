@@ -1,7 +1,5 @@
 #!/bin/ksh
 #
-# $Id$
-#
 # get performance data for a given database and system information
 #
 # by Helmut K. C. Tessarek

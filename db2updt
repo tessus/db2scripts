@@ -1,7 +1,5 @@
 #!/bin/ksh
 #
-# $Id$
-#
 # by Helmut K. C. Tessarek
 # name: db2updt
 # parameter[s]: [-b <baseInstallpathOfDB2>] [-i] [-a] [-h]
