@@ -1,0 +1,49 @@
+Most of the scripts were written for older versions of DB2 (< 9.5) or at a time
+where db2pd did not exist.
+Newer versions of DB2 already include this functionality which might render
+most of these scripts obsolete.
+
+bphr.db2
+
+Stored Procedures to show the buffer pool hit ratio.
+Newer versions of DB2 include this functionality, so it's pretty much obsolete.
+
+create_reorg
+
+Create reorg statements for a given tablespace.
+Use -h for more details.
+
+create_runstats
+
+Create runstats statements for a given tablespace.
+Use -h for more details.
+
+db2clean
+
+Stop processes and clean shared libraries for a given DB2 instance.
+Used before a fixpak upgrade.
+Newer versions of DB2 include this functionality in the installFixPack script.
+
+db2dbs
+
+Run a script on all local databases.
+DBNAME (in the script) is replaced with the actual database name.
+
+db2tbs
+
+Output a list of all tablespaces plus information on the tablespaces.
+You can use db2pd to get the same information.
+
+db2tbsc
+
+Output all tablespace containers.
+You can use db2pd to get the same information.
+
+db2updt
+
+Upgrade all database instances on a machine and run the post install steps.
+Newer versions of DB2 include this functionality in the installFixPack script.
+
+getperfdata
+
+Collect performance data on a database.
